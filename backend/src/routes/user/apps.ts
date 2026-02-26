@@ -4,6 +4,7 @@ import { AccountPoolService } from '../../services/accountPool.js';
 import { AccountSelector } from '../../services/accountSelector.js';
 import { getDownloadInfo, purchaseApp } from '../../services/appleClient.js';
 import { createTask } from '../../services/downloadManager.js';
+import type { Sinf } from '../../types/index.js';
 
 const router = Router();
 
@@ -16,7 +17,7 @@ const accountSelector = new AccountSelector();
  */
 router.get('/apps', (req: Request, res: Response) => {
   try {
-    const { country } = req.query;
+    const country = typeof req.query.country === 'string' ? req.query.country : undefined;
 
     let query = 'SELECT * FROM app_whitelist WHERE enabled = 1';
     const params: any[] = [];
@@ -141,17 +142,36 @@ router.post('/quick-download', async (req: Request, res: Response) => {
     await accountSelector.recordRateLimit(accountId, 'download');
 
     // 7. 创建下载任务
+    const sinfArray: Sinf[] = (sinfs.length > 0 ? sinfs : downloadInfo.sinfs).map((sinfData, index) => ({
+      id: index,
+      sinf: sinfData
+    }));
+    
     const task = createTask(
       {
         id: softwareId,
         bundleID: bundleId,
         name: (app as any).name,
         version: (app as any).version || 'latest',
-        artworkUrl: (app as any).artwork_url,
+        artworkUrl: (app as any).artwork_url || '',
+        // 添加 Software 类型的其他必需字段
+        artistName: '',
+        sellerName: '',
+        description: '',
+        averageUserRating: 0,
+        userRatingCount: 0,
+        screenshotUrls: [],
+        minimumOsVersion: '',
+        fileSizeBytes: '0',
+        releaseNotes: '',
+        formattedPrice: 'Free',
+        primaryGenreName: '',
+        price: 0,
+        releaseDate: new Date().toISOString(),
       },
       `pool_${accountId}`, // 使用特殊的 accountHash 标识这是账号池下载
       downloadInfo.downloadURL,
-      sinfs.length > 0 ? sinfs : downloadInfo.sinfs,
+      sinfArray,
       downloadInfo.metadata
     );
 
@@ -160,7 +180,7 @@ router.post('/quick-download', async (req: Request, res: Response) => {
       INSERT INTO download_history 
       (account_id, software_id, bundle_id, version, status)
       VALUES (?, ?, ?, ?, 'success')
-    `).run(accountId, softwareId, bundleId, (app as any).version || 'latest');
+    `).run(accountId, softwareId, bundleId, String((app as any).version || 'latest'));
 
     res.status(201).json({
       taskId: task.id,

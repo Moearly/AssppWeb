@@ -1,6 +1,8 @@
 services:
   asspp:
-    image: ghcr.io/lakr233/assppweb:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     volumes:
@@ -8,6 +10,10 @@ services:
     environment:
       - DATA_DIR=/data
       - PORT=8080
+      - ACCOUNT_POOL_KEY=${ACCOUNT_POOL_KEY}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - DB_PATH=${DB_PATH}
+      - UNSAFE_DANGEROUSLY_DISABLE_HTTPS_REDIRECT=${UNSAFE_DANGEROUSLY_DISABLE_HTTPS_REDIRECT}
     restart: unless-stopped
     logging:
       driver: "json-file"

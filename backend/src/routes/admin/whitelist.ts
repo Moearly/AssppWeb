@@ -14,7 +14,8 @@ const db = getDatabase();
  */
 router.get('/apps', (req: Request, res: Response) => {
   try {
-    const { country, enabled } = req.query;
+    const country = typeof req.query.country === 'string' ? req.query.country : undefined;
+    const enabledParam = typeof req.query.enabled === 'string' ? req.query.enabled : undefined;
 
     let query = 'SELECT * FROM app_whitelist WHERE 1=1';
     const params: any[] = [];
@@ -24,9 +25,9 @@ router.get('/apps', (req: Request, res: Response) => {
       params.push(country);
     }
 
-    if (enabled !== undefined) {
+    if (enabledParam !== undefined) {
       query += ' AND enabled = ?';
-      params.push(enabled === 'true' ? 1 : 0);
+      params.push(enabledParam === 'true' ? 1 : 0);
     }
 
     query += ' ORDER BY name ASC';
@@ -92,7 +93,7 @@ router.post('/apps', (req: Request, res: Response) => {
  */
 router.put('/apps/:id', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     const { name, artworkUrl, version, enabled } = req.body;
 
     if (isNaN(id)) {
@@ -148,7 +149,7 @@ router.put('/apps/:id', (req: Request, res: Response) => {
  */
 router.delete('/apps/:id', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
 
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid app ID' });
@@ -174,7 +175,7 @@ router.delete('/apps/:id', (req: Request, res: Response) => {
  */
 router.patch('/apps/:id/toggle', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
 
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid app ID' });

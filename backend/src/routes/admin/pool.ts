@@ -17,11 +17,12 @@ const healthService = new HealthCheckService();
  */
 router.get('/accounts', (req: Request, res: Response) => {
   try {
-    const { status, country } = req.query;
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const country = typeof req.query.country === 'string' ? req.query.country : undefined;
 
     const filters: any = {};
-    if (status) filters.status = status as string;
-    if (country) filters.country = country as string;
+    if (status) filters.status = status;
+    if (country) filters.country = country;
 
     const accounts = poolService.listAccounts(filters);
     res.json(accounts);
@@ -36,7 +37,7 @@ router.get('/accounts', (req: Request, res: Response) => {
  */
 router.get('/accounts/:id', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid account ID' });
       return;
@@ -108,7 +109,7 @@ router.post('/accounts', async (req: Request, res: Response) => {
  */
 router.delete('/accounts/:id', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid account ID' });
       return;
@@ -132,7 +133,7 @@ router.delete('/accounts/:id', (req: Request, res: Response) => {
  */
 router.patch('/accounts/:id/status', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     const { status } = req.body;
 
     if (isNaN(id)) {
@@ -160,7 +161,7 @@ router.patch('/accounts/:id/status', (req: Request, res: Response) => {
  */
 router.post('/accounts/:id/health', async (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid account ID' });
       return;
@@ -200,8 +201,9 @@ router.post('/health/check-all', async (req: Request, res: Response) => {
  */
 router.get('/accounts/:id/health/history', (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    const limit = parseInt(req.query.limit as string, 10) || 10;
+    const id = parseInt(req.params.id as string, 10);
+    const limitParam = typeof req.query.limit === 'string' ? req.query.limit : '10';
+    const limit = parseInt(limitParam, 10) || 10;
 
     if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid account ID' });
