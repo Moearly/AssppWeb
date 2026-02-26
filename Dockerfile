@@ -22,6 +22,7 @@ WORKDIR /app
 COPY --from=backend-build /app/backend/dist ./dist
 COPY --from=backend-build /app/backend/node_modules ./node_modules
 COPY --from=backend-build /app/backend/package.json ./
+COPY --from=backend-build /app/backend/src/db/schema.sql ./dist/db/
 COPY --from=frontend-build /app/frontend/dist ./public
 RUN mkdir -p /data/packages
 EXPOSE 8080
