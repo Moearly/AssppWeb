@@ -9,6 +9,7 @@ import MobileHeader from "./components/Layout/MobileHeader";
 import ToastContainer from "./components/common/ToastContainer";
 import GlobalDownloadNotifier from "./components/common/GlobalDownloadNotifier";
 
+// 零信任模式页面
 const HomePage = lazy(() => import("./components/Welcome/HomePage"));
 const AccountList = lazy(() => import("./components/Account/AccountList"));
 const AddAccountForm = lazy(
@@ -22,6 +23,14 @@ const DownloadList = lazy(() => import("./components/Download/DownloadList"));
 const AddDownload = lazy(() => import("./components/Download/AddDownload"));
 const PackageDetail = lazy(() => import("./components/Download/PackageDetail"));
 const SettingsPage = lazy(() => import("./components/Settings/SettingsPage"));
+
+// 账号池模式页面
+const PoolStorePage = lazy(() => import("./components/Pool/PoolStorePage"));
+
+// 管理员页面
+const AdminPoolPage = lazy(() => import("./components/Admin/AdminPoolPage"));
+const AdminWhitelistPage = lazy(() => import("./components/Admin/AdminWhitelistPage"));
+const AdminSettingsPage = lazy(() => import("./components/Admin/AdminSettingsPage"));
 
 function Loading() {
   const { t } = useTranslation();
@@ -56,6 +65,16 @@ export default function App() {
     return () => mediaQuery.removeEventListener("change", applyTheme);
   }, [theme]);
 
+  // 初始化管理员 API Key
+  useEffect(() => {
+    const savedKey = localStorage.getItem('adminApiKey');
+    if (savedKey) {
+      import('./api/admin').then(({ setAdminApiKey }) => {
+        setAdminApiKey(savedKey);
+      });
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex text-gray-900 dark:text-gray-100 transition-colors duration-200">
       <ToastContainer />
@@ -66,6 +85,7 @@ export default function App() {
         <MobileHeader />
         <Suspense fallback={<Loading />}>
           <Routes>
+            {/* 零信任模式路由 */}
             <Route path="/" element={<HomePage />} />
             <Route path="/accounts" element={<AccountList />} />
             <Route path="/accounts/add" element={<AddAccountForm />} />
@@ -80,6 +100,14 @@ export default function App() {
             <Route path="/downloads/add" element={<AddDownload />} />
             <Route path="/downloads/:id" element={<PackageDetail />} />
             <Route path="/settings" element={<SettingsPage />} />
+
+            {/* 账号池模式路由 */}
+            <Route path="/pool/store" element={<PoolStorePage />} />
+
+            {/* 管理员路由 */}
+            <Route path="/admin/pool" element={<AdminPoolPage />} />
+            <Route path="/admin/whitelist" element={<AdminWhitelistPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
           </Routes>
         </Suspense>
       </main>
