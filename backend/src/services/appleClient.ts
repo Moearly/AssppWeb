@@ -1,5 +1,20 @@
 import axios, { AxiosRequestConfig } from 'axios';
 import { buildPlist, parsePlist } from './plist.js';
+import fs from 'fs';
+
+const appleLogFile = '/data/apple-debug.log';
+
+function appleLog(msg: string) {
+  try {
+    fs.appendFileSync(appleLogFile, `${new Date().toISOString()} ${msg}\n`);
+  } catch (e) {
+    try {
+      fs.appendFileSync('/tmp/apple-debug.log', `${new Date().toISOString()} ${msg} (fallback)\n`);
+    } catch (e2) {
+      // Give up
+    }
+  }
+}
 
 /**
  * Cookie 接口
@@ -36,7 +51,8 @@ interface AppleResponse {
  * 注意：这是服务器端实现，不使用 libcurl.js
  */
 export class AppleClient {
-  private static readonly USER_AGENT = 'Configurator/2.15 (Macintosh; OS X 11.0.0; 16G29) AppleWebKit/2603.3.8';
+  // 使用与前端相同的 User-Agent
+  private static readonly USER_AGENT = 'Configurator/2.17 (Macintosh; OS X 15.2; 24C5089c) AppleWebKit/0620.1.16.11.6';
   
   /**
    * 发送请求到 Apple 服务器
@@ -50,7 +66,7 @@ export class AppleClient {
         ...config.headers,
       },
       data: config.body,
-      maxRedirects: 3,
+      maxRedirects: 0, // 禁用自动重定向，手动处理
       validateStatus: () => true, // 不自动抛出错误
       transformResponse: [(data) => data], // 返回原始字符串
     };
@@ -150,6 +166,8 @@ export interface BagConfig {
  * 获取 Bag 配置
  */
 export async function fetchBag(deviceId: string): Promise<BagConfig> {
+  appleLog('[BAG] Fetching bag for device: ' + deviceId);
+  
   const response = await AppleClient.request({
     method: 'GET',
     url: `https://init.itunes.apple.com/bag.xml?guid=${deviceId}`,
@@ -158,11 +176,55 @@ export async function fetchBag(deviceId: string): Promise<BagConfig> {
     },
   });
 
-  const bag = parsePlist(response.body);
+  appleLog(`[BAG] Response status: ${response.status}`);
+  appleLog(`[BAG] Response length: ${response.body.length}`);
+  appleLog(`[BAG] Response preview: ${response.body.substring(0, 200)}`);
+
+  // Bag XML 格式特殊：<Document><Protocol><plist>...</plist></Protocol></Document>
+  // 需要提取出 plist 部分
+  let plistXml = response.body;
+  
+  // 如果包含 <Protocol> 标签，提取 plist 部分
+  const protocolMatch = response.body.match(/<plist[^>]*>[\s\S]*<\/plist>/);
+  if (protocolMatch) {
+    plistXml = protocolMatch[0];
+    appleLog('[BAG] Extracted plist from Protocol wrapper');
+    appleLog(`[BAG] Extracted plist length: ${plistXml.length}`);
+    appleLog(`[BAG] Extracted plist preview: ${plistXml.substring(0, 500)}`);
+  } else {
+    appleLog('[BAG] WARNING: No <plist> found in response');
+  }
+
+  let bag: any;
+  try {
+    bag = parsePlist(plistXml);
+    appleLog('[BAG] Bag parsed successfully');
+  } catch (error) {
+    appleLog(`[BAG] ERROR: Bag parse failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  }
+  
+  // authenticateAccount may be at top level or inside urlBag dict
+  let authURL: string | undefined;
+  const urlBag = bag.urlBag as Record<string, any> | undefined;
+  if (urlBag) {
+    authURL = urlBag.authenticateAccount as string | undefined;
+    if (authURL) {
+      appleLog('[BAG] Found authURL in urlBag');
+    }
+  }
+  if (!authURL) {
+    authURL = bag.authenticateAccount as string | undefined;
+    if (authURL) {
+      appleLog('[BAG] Found authURL at top level');
+    }
+  }
+  
+  appleLog(`[BAG] authURL: ${authURL || 'NOT FOUND'}`);
 
   return {
-    authURL: bag.authenticateAccount || 'https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate',
-    buyURL: bag.volumeStoreDownloadProduct || 'https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct',
+    authURL: authURL || 'https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate',
+    buyURL: bag.volumeStoreDownloadProduct || bag.buy || 'https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct',
   };
 }
 
@@ -174,6 +236,8 @@ export interface AuthenticateParams {
   password: string;
   deviceId: string;
   existingCookies?: Cookie[];
+  verificationCode?: string; // 2FA verification code
+  passwordToken?: string; // 已保存的密码令牌（用于健康检查）
 }
 
 export interface AuthenticateResult {
@@ -187,58 +251,145 @@ export interface AuthenticateResult {
 export async function authenticateAccount(
   params: AuthenticateParams
 ): Promise<AuthenticateResult> {
+  appleLog('[AUTH] === Authentication Start ===');
+  appleLog(`[AUTH] Email: ${params.email}`);
+  appleLog(`[AUTH] Device: ${params.deviceId}`);
+  appleLog(`[AUTH] Has passwordToken: ${!!params.passwordToken}`);
+  appleLog(`[AUTH] Has verificationCode: ${!!params.verificationCode}`);
+  appleLog(`[AUTH] verificationCode value: ${params.verificationCode || 'none'}`);
+
   const bag = await fetchBag(params.deviceId);
+  appleLog(`[AUTH] Bag authURL: ${bag.authURL}`);
 
   const authURL = new URL(bag.authURL);
   authURL.searchParams.set('guid', params.deviceId);
 
+  // 如果有 passwordToken，使用 token 而不是密码
+  const passwordValue = params.passwordToken || 
+    (params.verificationCode 
+      ? `${params.password}${params.verificationCode}` 
+      : params.password);
+
+  appleLog(`[AUTH] Password value type: ${params.passwordToken ? 'token' : params.verificationCode ? '2FA' : 'plain'}`);
+
   const body = buildPlist({
     appleId: params.email,
-    password: params.password,
-    attempt: '4',
+    password: passwordValue,
+    attempt: params.verificationCode ? '2' : '4',
     guid: params.deviceId,
     rmp: '0',
     why: 'signIn',
   });
 
-  const response = await AppleClient.request({
-    method: 'POST',
-    url: authURL.toString(),
-    headers: {
-      'Content-Type': 'application/x-apple-plist',
-    },
-    body,
-    cookies: params.existingCookies,
-  });
+  appleLog(`[AUTH] Request body length: ${body.length}`);
 
-  if (response.status !== 200) {
-    throw new Error(`Authentication failed with status ${response.status}`);
-  }
+  let currentURL = authURL.toString();
+  let redirectCount = 0;
+  const maxRedirects = 3;
 
-  const result = parsePlist(response.body);
+  while (redirectCount <= maxRedirects) {
+    appleLog(`[AUTH] Attempt ${redirectCount + 1}: ${currentURL}`);
 
-  if (result.failureType) {
-    throw new Error(
-      result.customerMessage || `Authentication failed: ${result.failureType}`
+    const response = await AppleClient.request({
+      method: 'POST',
+      url: currentURL,
+      headers: {
+        'Content-Type': 'application/x-apple-plist',
+      },
+      body,
+      cookies: params.existingCookies,
+    });
+
+    appleLog(`[AUTH] Response status: ${response.status}`);
+    appleLog(`[AUTH] Response body length: ${response.body.length}`);
+    appleLog(`[AUTH] Response preview: ${response.body.substring(0, 200)}`);
+
+    // 处理重定向（302）
+    if (response.status === 302) {
+      const location = response.headers['location'];
+      if (!location) {
+        appleLog('[AUTH] ERROR: Redirect without Location header');
+        throw new Error('Redirect without Location header');
+      }
+      currentURL = location.startsWith('http') ? location : `https://${new URL(currentURL).host}${location}`;
+      redirectCount++;
+      appleLog(`[AUTH] Following redirect to: ${currentURL}`);
+      continue;
+    }
+
+    // 检查响应体
+    if (!response.body || !response.body.trim()) {
+      appleLog(`[AUTH] ERROR: Empty response body, status: ${response.status}`);
+      throw new Error(`Authentication failed with empty body (status ${response.status})`);
+    }
+
+    if (response.status !== 200) {
+      const preview = response.body.substring(0, 500);
+      appleLog(`[AUTH] ERROR: Non-200 status: ${response.status}, body: ${preview}`);
+      throw new Error(`Authentication failed with status ${response.status}`);
+    }
+
+    let result: any;
+    try {
+      result = parsePlist(response.body);
+      appleLog('[AUTH] Plist parsed successfully');
+    } catch (error) {
+      appleLog(`[AUTH] ERROR: Plist parse failed: ${error instanceof Error ? error.message : String(error)}`);
+      appleLog(`[AUTH] Response body: ${response.body.substring(0, 1000)}`);
+      throw new Error(`Failed to parse authentication response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    if (result.failureType) {
+      appleLog(`[AUTH] ERROR: Auth failed: ${result.customerMessage || result.failureType}`);
+      throw new Error(
+        result.customerMessage || `Authentication failed: ${result.failureType}`
+      );
+    }
+
+    // 检查是否需要2FA
+    if (
+      result.failureType === '' &&
+      !params.verificationCode &&
+      result.customerMessage === 'MZFinance.BadLogin.Configurator_message'
+    ) {
+      appleLog('[AUTH] ERROR: 2FA required but not provided');
+      throw new Error('REQUIRES_2FA_VERIFICATION');
+    }
+
+    const accountInfo = result.accountInfo;
+    if (!accountInfo || !accountInfo.address) {
+      appleLog('[AUTH] ERROR: Missing accountInfo or address');
+      throw new Error('Authentication response missing required fields');
+    }
+
+    if (!result.passwordToken || !result.dsPersonId) {
+      appleLog('[AUTH] ERROR: Missing passwordToken or dsPersonId');
+      appleLog(`[AUTH] result keys: ${Object.keys(result).join(', ')}`);
+      appleLog(`[AUTH] passwordToken value: ${JSON.stringify(result.passwordToken)}`);
+      appleLog(`[AUTH] dsPersonId value: ${JSON.stringify(result.dsPersonId)}`);
+      throw new Error('Authentication response missing passwordToken or dsPersonId');
+    }
+
+    const cookies = AppleClient.mergeCookies(
+      params.existingCookies || [],
+      response.cookies
     );
+
+    appleLog('[AUTH] === Authentication Success ===');
+    appleLog(`[AUTH] Returning passwordToken: ${result.passwordToken}`);
+    appleLog(`[AUTH] Returning DSID: ${result.dsPersonId}`);
+
+    return {
+      passwordToken: result.passwordToken,
+      DSID: result.dsPersonId,
+      cookies,
+      pod: AppleClient.extractPod(response.headers),
+      storeFront: AppleClient.extractStoreFront(response.headers),
+    };
   }
 
-  if (!result.passwordToken || !result.dsPersonId) {
-    throw new Error('Authentication response missing required fields');
-  }
-
-  const cookies = AppleClient.mergeCookies(
-    params.existingCookies || [],
-    response.cookies
-  );
-
-  return {
-    passwordToken: result.passwordToken,
-    DSID: result.dsPersonId,
-    cookies,
-    pod: AppleClient.extractPod(response.headers),
-    storeFront: AppleClient.extractStoreFront(response.headers),
-  };
+  appleLog(`[AUTH] ERROR: Max redirects (${maxRedirects}) exceeded`);
+  throw new Error(`Authentication failed after ${maxRedirects} redirects`);
 }
 
 /**

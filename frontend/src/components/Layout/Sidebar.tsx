@@ -2,7 +2,6 @@ import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useState, useEffect } from "react";
 import {
-  HomeIcon,
   AccountsIcon,
   SearchIcon,
   DownloadsIcon,
@@ -15,15 +14,9 @@ import { useSettingsStore } from "../../store/settings";
 import { getAdminApiKey } from "../../api/admin";
 
 const navItems = [
-  { to: "/", label: "home", icon: HomeIcon },
-  { to: "/accounts", label: "accounts", icon: AccountsIcon },
-  { to: "/search", label: "search", icon: SearchIcon },
+  { to: "/pool/store", label: "store", icon: SearchIcon },
   { to: "/downloads", label: "downloads", icon: DownloadsIcon },
   { to: "/settings", label: "settings", icon: SettingsIcon },
-];
-
-const poolNavItems = [
-  { to: "/pool/store", label: "应用商店", icon: SearchIcon },
 ];
 
 const adminNavItems = [
@@ -64,16 +57,13 @@ export default function Sidebar() {
         </h1>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {/* 零信任模式 */}
+        {/* 用户导航 */}
         <div className="mb-4">
-          <div className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-            零信任模式
-          </div>
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === "/"}
+              end={item.to === "/pool/store"}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive
@@ -84,29 +74,6 @@ export default function Sidebar() {
             >
               <item.icon className="w-5 h-5" />
               {t(`nav.${item.label}`)}
-            </NavLink>
-          ))}
-        </div>
-
-        {/* 账号池模式 */}
-        <div className="mb-4">
-          <div className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-            账号池模式
-          </div>
-          {poolNavItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
-                }`
-              }
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label}
             </NavLink>
           ))}
         </div>

@@ -1,58 +1,73 @@
 /**
- * 账号池模式用户端 API
- * 普通用户使用，无需认证
+ * 账号池 API 客户端（用户端）
+ * 用于获取和释放池账号
  */
 
-export interface PoolApp {
-  id: number;
-  software_id: number;
-  bundle_id: string;
-  name: string;
+export interface PoolAccountCredentials {
+  accountId: number;
+  email: string;
+  password: string;
+  deviceIdentifier: string;
   country: string;
-  artwork_url: string | null;
-  version: string | null;
-  enabled: number;
-  created_at: string;
-  updated_at: string;
+  pod: number | null;
+  passwordToken?: string;
+  DSID?: string;
+  cookies?: Record<string, string>;
+  verificationCodeApi?: string | null;
 }
 
-export interface QuickDownloadRequest {
-  softwareId: number;
-  bundleId: string;
-  country: string;
-}
+/**
+ * 分配账号（获取池账号凭据）
+ */
+export async function allocatePoolAccount(country?: string): Promise<PoolAccountCredentials> {
+  const response = await fetch('/api/pool/allocate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ country }),
+  });
 
-export interface QuickDownloadResponse {
-  taskId: string;
-  message: string;
-}
-
-async function fetchJSON<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, options);
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `HTTP ${response.status}`);
+    const error = await response.json();
+    throw new Error(error.message || error.error || 'Failed to allocate account');
   }
+
   return response.json();
 }
 
 /**
- * 获取可下载的应用列表（白名单）
+ * 释放账号
  */
-export async function getPoolApps(country?: string): Promise<PoolApp[]> {
-  const url = country ? `/api/user/apps?country=${country}` : '/api/user/apps';
-  return fetchJSON(url);
+export async function releasePoolAccount(accountId: number): Promise<void> {
+  const response = await fetch(`/api/pool/release/${accountId}`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to release account');
+  }
 }
 
 /**
- * 一键下载应用（使用账号池）
+ * 更新账号凭据（认证成功后回传）
  */
-export async function quickDownload(
-  data: QuickDownloadRequest,
-): Promise<QuickDownloadResponse> {
-  return fetchJSON('/api/user/quick-download', {
+export async function updatePoolAccountCredentials(
+  accountId: number,
+  credentials: {
+    passwordToken?: string;
+    DSID?: string;
+    cookies?: Record<string, string>;
+    pod?: number;
+  }
+): Promise<void> {
+  const response = await fetch(`/api/pool/update-credentials/${accountId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify(credentials),
   });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to update credentials');
+  }
 }

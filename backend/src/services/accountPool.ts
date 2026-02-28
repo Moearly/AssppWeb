@@ -50,7 +50,7 @@ export interface AddAccountParams {
  * 账号池管理服务
  */
 export class AccountPoolService {
-  private db: Database.Database;
+  public db: Database.Database;  // 改为 public 以便直接访问
 
   constructor() {
     this.db = getDatabase();
@@ -116,6 +116,18 @@ export class AccountPoolService {
       .get(id) as PoolAccount | undefined;
 
     return row || null;
+  }
+
+  /**
+   * 获取账号凭据（解密）
+   */
+  getAccountCredentials(id: number): AccountCredentials | null {
+    const account = this.getAccountById(id);
+    if (!account || !account.encryptedData) {
+      return null;
+    }
+
+    return decryptCredentials(account.encryptedData);
   }
 
   /**
@@ -242,6 +254,33 @@ export class AccountPoolService {
         WHERE id = ?
       `)
       .run(id);
+  }
+
+  /**
+   * 选择最佳可用账号
+   */
+  selectAccount(country?: string): Omit<PoolAccount, 'encryptedData'> | null {
+    let query = `
+      SELECT 
+        id, email, email_hash as emailHash, country, 
+        device_identifier as deviceIdentifier, pod, status,
+        last_used_at as lastUsedAt, usage_count as usageCount,
+        created_at as createdAt, updated_at as updatedAt
+      FROM account_pool
+      WHERE status = 'active'
+    `;
+
+    const params: any[] = [];
+
+    if (country) {
+      query += ' AND country = ?';
+      params.push(country);
+    }
+
+    // 优先选择：使用次数少 + 最久未使用
+    query += ' ORDER BY usage_count ASC, last_used_at ASC NULLS FIRST LIMIT 1';
+
+    return this.db.prepare(query).get(...params) as any || null;
   }
 
   /**

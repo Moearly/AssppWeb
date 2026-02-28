@@ -7,7 +7,7 @@ import { setAdminApiKey, getAdminApiKey, getPoolStats } from '../../api/admin';
 
 export default function AdminSettingsPage() {
   const { t } = useTranslation();
-  const showToast = useToastStore((s) => s.showToast);
+  const addToast = useToastStore((s) => s.addToast);
 
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -25,7 +25,7 @@ export default function AdminSettingsPage() {
   // 保存配置
   const handleSave = () => {
     if (!apiKey.trim()) {
-      showToast('请输入 API Key', 'error');
+      addToast('请输入 API Key', 'error');
       return;
     }
 
@@ -33,16 +33,16 @@ export default function AdminSettingsPage() {
       setAdminApiKey(apiKey.trim());
       localStorage.setItem('adminApiKey', apiKey.trim());
       setIsConfigured(true);
-      showToast('配置已保存', 'success');
+      addToast('配置已保存', 'success');
     } catch (err) {
-      showToast('保存失败', 'error');
+      addToast('保存失败', 'error');
     }
   };
 
   // 测试连接
   const handleTest = async () => {
     if (!apiKey.trim()) {
-      showToast('请先输入 API Key', 'error');
+      addToast('请先输入 API Key', 'error');
       return;
     }
 
@@ -50,14 +50,15 @@ export default function AdminSettingsPage() {
       setTesting(true);
       setAdminApiKey(apiKey.trim());
       await getPoolStats();
-      showToast('连接成功！API Key 有效', 'success');
+      addToast('连接成功！API Key 有效', 'success');
       localStorage.setItem('adminApiKey', apiKey.trim());
       setIsConfigured(true);
     } catch (err: any) {
-      if (err.response?.status === 401) {
-        showToast('API Key 无效', 'error');
+      const errorMessage = err.message || String(err);
+      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        addToast('API Key 无效', 'error');
       } else {
-        showToast('连接失败: ' + (err.message || '未知错误'), 'error');
+        addToast('连接失败: ' + errorMessage, 'error');
       }
       setIsConfigured(false);
     } finally {
@@ -73,7 +74,7 @@ export default function AdminSettingsPage() {
     setIsConfigured(false);
     setAdminApiKey('');
     localStorage.removeItem('adminApiKey');
-    showToast('配置已清除', 'success');
+    addToast('配置已清除', 'success');
   };
 
   return (

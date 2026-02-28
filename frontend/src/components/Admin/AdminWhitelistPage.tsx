@@ -20,7 +20,7 @@ import { countryNames } from '../../utils/countries';
 
 export default function AdminWhitelistPage() {
   const { t } = useTranslation();
-  const showToast = useToastStore((s) => s.showToast);
+  const addToast = useToastStore((s) => s.addToast);
 
   const [apps, setApps] = useState<WhitelistApp[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +93,7 @@ export default function AdminWhitelistPage() {
   // 保存（添加或更新）
   const handleSave = async () => {
     if (!formData.name || (!editingApp && (!formData.softwareId || !formData.bundleId))) {
-      showToast('请填写所有必填字段', 'error');
+      addToast('请填写所有必填字段', 'error');
       return;
     }
 
@@ -106,7 +106,7 @@ export default function AdminWhitelistPage() {
           artworkUrl: formData.artworkUrl || undefined,
           version: formData.version || undefined,
         });
-        showToast('应用已更新', 'success');
+        addToast('应用已更新', 'success');
       } else {
         // 添加
         await addWhitelistApp({
@@ -117,12 +117,12 @@ export default function AdminWhitelistPage() {
           artworkUrl: formData.artworkUrl || undefined,
           version: formData.version || undefined,
         });
-        showToast('应用已添加', 'success');
+        addToast('应用已添加', 'success');
       }
       setShowModal(false);
       loadData();
     } catch (err) {
-      showToast(getErrorMessage(err, '保存失败'), 'error');
+      addToast(getErrorMessage(err, '保存失败'), 'error');
     } finally {
       setSaving(false);
     }
@@ -134,10 +134,10 @@ export default function AdminWhitelistPage() {
 
     try {
       await deleteWhitelistApp(id);
-      showToast('应用已删除', 'success');
+      addToast('应用已删除', 'success');
       loadData();
     } catch (err) {
-      showToast(getErrorMessage(err, '删除失败'), 'error');
+      addToast(getErrorMessage(err, '删除失败'), 'error');
     }
   };
 
@@ -145,10 +145,10 @@ export default function AdminWhitelistPage() {
   const handleToggle = async (id: number) => {
     try {
       await toggleWhitelistApp(id);
-      showToast('状态已更新', 'success');
+      addToast('状态已更新', 'success');
       loadData();
     } catch (err) {
-      showToast(getErrorMessage(err, '更新失败'), 'error');
+      addToast(getErrorMessage(err, '更新失败'), 'error');
     }
   };
 

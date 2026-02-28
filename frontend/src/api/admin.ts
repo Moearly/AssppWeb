@@ -95,8 +95,22 @@ function getHeaders(): Record<string, string> {
 async function fetchJSON<T>(url: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(url, options);
   if (!response.ok) {
+    // 获取响应文本
     const text = await response.text();
-    throw new Error(text || `HTTP ${response.status}`);
+    
+    // 尝试解析为JSON
+    try {
+      const json = JSON.parse(text);
+      const error: any = new Error(json.message || `HTTP ${response.status}`);
+      error.response = { status: response.status, data: json };
+      throw error;
+    } catch (e) {
+      // JSON解析失败，使用原始文本
+      if (e instanceof Error && e.response) {
+        throw e; // 重新抛出已包装的错误
+      }
+      throw new Error(text || `HTTP ${response.status}`);
+    }
   }
   return response.json();
 }
@@ -124,6 +138,14 @@ export async function addPoolAccount(data: AddAccountRequest): Promise<PoolAccou
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify(data),
+  });
+}
+
+export async function verify2FAAccount(id: number, verificationCode: string): Promise<PoolAccount> {
+  return fetchJSON(`/api/admin/pool/accounts/${id}/verify-2fa`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify({ verificationCode }),
   });
 }
 
@@ -222,3 +244,31 @@ export async function toggleWhitelistApp(id: number): Promise<void> {
     body: JSON.stringify({}),
   });
 }
+
+// ============ 批量导入 ============
+
+export interface BatchImportResult {
+  total: number;
+  success: number;
+  failed: number;
+  results: Array<{
+    email?: string;
+    line?: string;
+    success: boolean;
+    error?: string;
+    accountId?: number;
+    deviceId?: string;
+  }>;
+}
+
+export async function batchImportAccounts(data: {
+  accountsText: string;
+  country?: string;
+}): Promise<BatchImportResult> {
+  return fetchJSON('/api/admin/pool/accounts/batch', {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+}
+

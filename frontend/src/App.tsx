@@ -1,5 +1,5 @@
-import { Routes, Route } from "react-router-dom";
-import { lazy, Suspense, useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "./store/settings";
 
@@ -9,28 +9,14 @@ import MobileHeader from "./components/Layout/MobileHeader";
 import ToastContainer from "./components/common/ToastContainer";
 import GlobalDownloadNotifier from "./components/common/GlobalDownloadNotifier";
 
-// 零信任模式页面
-const HomePage = lazy(() => import("./components/Welcome/HomePage"));
-const AccountList = lazy(() => import("./components/Account/AccountList"));
-const AddAccountForm = lazy(
-  () => import("./components/Account/AddAccountForm"),
-);
-const AccountDetail = lazy(() => import("./components/Account/AccountDetail"));
-const SearchPage = lazy(() => import("./components/Search/SearchPage"));
-const ProductDetail = lazy(() => import("./components/Search/ProductDetail"));
-const VersionHistory = lazy(() => import("./components/Search/VersionHistory"));
-const DownloadList = lazy(() => import("./components/Download/DownloadList"));
-const AddDownload = lazy(() => import("./components/Download/AddDownload"));
-const PackageDetail = lazy(() => import("./components/Download/PackageDetail"));
-const SettingsPage = lazy(() => import("./components/Settings/SettingsPage"));
-
-// 账号池模式页面
-const PoolStorePage = lazy(() => import("./components/Pool/PoolStorePage"));
-
-// 管理员页面
-const AdminPoolPage = lazy(() => import("./components/Admin/AdminPoolPage"));
-const AdminWhitelistPage = lazy(() => import("./components/Admin/AdminWhitelistPage"));
-const AdminSettingsPage = lazy(() => import("./components/Admin/AdminSettingsPage"));
+// 直接导入所有组件（移除懒加载）
+import DownloadList from "./components/Download/DownloadList";
+import PackageDetail from "./components/Download/PackageDetail";
+import SettingsPage from "./components/Settings/SettingsPage";
+import PoolStorePage from "./components/Pool/PoolStorePage";
+import AdminPoolPage from "./components/Admin/AdminPoolPage";
+import AdminWhitelistPage from "./components/Admin/AdminWhitelistPage";
+import AdminSettingsPage from "./components/Admin/AdminSettingsPage";
 
 function Loading() {
   const { t } = useTranslation();
@@ -83,33 +69,21 @@ export default function App() {
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0 safe-top">
         <MobileHeader />
-        <Suspense fallback={<Loading />}>
-          <Routes>
-            {/* 零信任模式路由 */}
-            <Route path="/" element={<HomePage />} />
-            <Route path="/accounts" element={<AccountList />} />
-            <Route path="/accounts/add" element={<AddAccountForm />} />
-            <Route path="/accounts/:email" element={<AccountDetail />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/search/:appId" element={<ProductDetail />} />
-            <Route
-              path="/search/:appId/versions"
-              element={<VersionHistory />}
-            />
-            <Route path="/downloads" element={<DownloadList />} />
-            <Route path="/downloads/add" element={<AddDownload />} />
-            <Route path="/downloads/:id" element={<PackageDetail />} />
-            <Route path="/settings" element={<SettingsPage />} />
+        <Routes>
+          {/* 默认路由 - 重定向到应用商店 */}
+          <Route path="/" element={<Navigate to="/pool/store" replace />} />
+          
+          {/* 账号池模式路由 */}
+          <Route path="/pool/store" element={<PoolStorePage />} />
+          <Route path="/downloads" element={<DownloadList />} />
+          <Route path="/downloads/:id" element={<PackageDetail />} />
+          <Route path="/settings" element={<SettingsPage />} />
 
-            {/* 账号池模式路由 */}
-            <Route path="/pool/store" element={<PoolStorePage />} />
-
-            {/* 管理员路由 */}
-            <Route path="/admin/pool" element={<AdminPoolPage />} />
-            <Route path="/admin/whitelist" element={<AdminWhitelistPage />} />
-            <Route path="/admin/settings" element={<AdminSettingsPage />} />
-          </Routes>
-        </Suspense>
+          {/* 管理员路由 */}
+          <Route path="/admin/pool" element={<AdminPoolPage />} />
+          <Route path="/admin/whitelist" element={<AdminWhitelistPage />} />
+          <Route path="/admin/settings" element={<AdminSettingsPage />} />
+        </Routes>
       </main>
       <MobileNav />
     </div>

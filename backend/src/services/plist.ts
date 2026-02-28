@@ -71,10 +71,22 @@ export function parsePlist(xml: string): any {
   const root = doc.documentElement;
 
   if (root.nodeName !== 'plist') {
-    throw new Error('Invalid plist: root element is not <plist>');
+    // 输出前500个字符用于调试
+    const preview = xml.substring(0, 500);
+    console.error('❌ Invalid plist response:', preview);
+    throw new Error(`Invalid plist: root element is not <plist>, got <${root.nodeName}>. Response preview: ${preview}`);
   }
 
-  const firstChild = root.firstElementChild;
+  // 使用childNodes代替firstElementChild（@xmldom/xmldom不支持）
+  let firstChild: Element | null = null;
+  for (let i = 0; i < root.childNodes.length; i++) {
+    const node = root.childNodes[i];
+    if (node.nodeType === 1) { // ELEMENT_NODE
+      firstChild = node as Element;
+      break;
+    }
+  }
+  
   if (!firstChild) {
     throw new Error('Invalid plist: empty <plist> element');
   }
