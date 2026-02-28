@@ -409,9 +409,19 @@ export interface PurchaseResult {
 }
 
 export async function purchaseApp(params: PurchaseParams): Promise<PurchaseResult> {
+  appleLog('[PURCHASE] === Purchase Start ===');
+  appleLog(`[PURCHASE] App ID: ${params.appId}`);
+  appleLog(`[PURCHASE] Device: ${params.deviceId}`);
+  appleLog(`[PURCHASE] Pod: ${params.pod || 'none'}`);
+  appleLog(`[PURCHASE] DSID: ${params.DSID}`);
+  appleLog(`[PURCHASE] Has passwordToken: ${!!params.passwordToken}`);
+  appleLog(`[PURCHASE] Cookies count: ${params.cookies.length}`);
+
   const host = params.pod
     ? `p${params.pod}-buy.itunes.apple.com`
     : 'buy.itunes.apple.com';
+
+  appleLog(`[PURCHASE] Target host: ${host}`);
 
   const body = buildPlist({
     creditDisplay: '',
@@ -419,6 +429,8 @@ export async function purchaseApp(params: PurchaseParams): Promise<PurchaseResul
     salableAdamId: params.appId,
     appExtVrsId: 0, // 0 = latest version
   });
+
+  appleLog(`[PURCHASE] Request body length: ${body.length}`);
 
   const response = await AppleClient.request({
     method: 'POST',
@@ -433,21 +445,40 @@ export async function purchaseApp(params: PurchaseParams): Promise<PurchaseResul
     cookies: params.cookies,
   });
 
+  appleLog(`[PURCHASE] Response status: ${response.status}`);
+  appleLog(`[PURCHASE] Response body length: ${response.body.length}`);
+  appleLog(`[PURCHASE] Response preview: ${response.body.substring(0, 500)}`);
+
   if (response.status !== 200) {
+    appleLog(`[PURCHASE] ERROR: Non-200 status: ${response.status}`);
     throw new Error(`Purchase failed with status ${response.status}`);
   }
 
-  const result = parsePlist(response.body);
+  let result: any;
+  try {
+    result = parsePlist(response.body);
+    appleLog('[PURCHASE] Plist parsed successfully');
+  } catch (error) {
+    appleLog(`[PURCHASE] ERROR: Plist parse failed: ${error instanceof Error ? error.message : String(error)}`);
+    appleLog(`[PURCHASE] Response body: ${response.body.substring(0, 1000)}`);
+    throw new Error(`Failed to parse purchase response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 
   if (result.failureType) {
+    appleLog(`[PURCHASE] ERROR: Purchase failed: ${result.customerMessage || result.failureType}`);
+    appleLog(`[PURCHASE] Full result: ${JSON.stringify(result, null, 2)}`);
     throw new Error(result.customerMessage || `Purchase failed: ${result.failureType}`);
   }
 
   if (!result.songList || result.songList.length === 0) {
+    appleLog('[PURCHASE] ERROR: No SINF data returned');
+    appleLog(`[PURCHASE] result keys: ${Object.keys(result).join(', ')}`);
     throw new Error('No SINF data returned');
   }
 
   const sinfs = result.songList.map((song: any) => song.sinf);
+  appleLog(`[PURCHASE] === Purchase Success ===`);
+  appleLog(`[PURCHASE] SINF count: ${sinfs.length}`);
 
   return { sinfs };
 }
@@ -468,9 +499,17 @@ export interface DownloadInfoResult {
 export async function getDownloadInfo(
   params: DownloadInfoParams
 ): Promise<DownloadInfoResult> {
+  appleLog('[DOWNLOAD_INFO] === Get Download Info Start ===');
+  appleLog(`[DOWNLOAD_INFO] App ID: ${params.appId}`);
+  appleLog(`[DOWNLOAD_INFO] Device: ${params.deviceId}`);
+  appleLog(`[DOWNLOAD_INFO] Pod: ${params.pod || 'none'}`);
+  appleLog(`[DOWNLOAD_INFO] External version ID: ${params.externalVersionId || 'latest'}`);
+
   const host = params.pod
     ? `p${params.pod}-buy.itunes.apple.com`
     : 'p25-buy.itunes.apple.com';
+
+  appleLog(`[DOWNLOAD_INFO] Target host: ${host}`);
 
   const body = buildPlist({
     creditDisplay: '',
@@ -478,6 +517,8 @@ export async function getDownloadInfo(
     salableAdamId: params.appId,
     ...(params.externalVersionId && { appExtVrsId: params.externalVersionId }),
   });
+
+  appleLog(`[DOWNLOAD_INFO] Request body length: ${body.length}`);
 
   const response = await AppleClient.request({
     method: 'POST',
@@ -492,23 +533,40 @@ export async function getDownloadInfo(
     cookies: params.cookies,
   });
 
+  appleLog(`[DOWNLOAD_INFO] Response status: ${response.status}`);
+  appleLog(`[DOWNLOAD_INFO] Response body length: ${response.body.length}`);
+  appleLog(`[DOWNLOAD_INFO] Response preview: ${response.body.substring(0, 500)}`);
+
   if (response.status !== 200) {
+    appleLog(`[DOWNLOAD_INFO] ERROR: Non-200 status: ${response.status}`);
     throw new Error(`Get download info failed with status ${response.status}`);
   }
 
-  const result = parsePlist(response.body);
+  let result: any;
+  try {
+    result = parsePlist(response.body);
+    appleLog('[DOWNLOAD_INFO] Plist parsed successfully');
+  } catch (error) {
+    appleLog(`[DOWNLOAD_INFO] ERROR: Plist parse failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Failed to parse download info response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 
   if (result.failureType) {
+    appleLog(`[DOWNLOAD_INFO] ERROR: ${result.customerMessage || result.failureType}`);
     throw new Error(
       result.customerMessage || `Get download info failed: ${result.failureType}`
     );
   }
 
   if (!result.songList || result.songList.length === 0) {
+    appleLog('[DOWNLOAD_INFO] ERROR: No download info returned');
     throw new Error('No download info returned');
   }
 
   const song = result.songList[0];
+  appleLog(`[DOWNLOAD_INFO] === Get Download Info Success ===`);
+  appleLog(`[DOWNLOAD_INFO] Download URL: ${song.URL}`);
+  appleLog(`[DOWNLOAD_INFO] SINF count: ${result.songList.length}`);
 
   return {
     downloadURL: song.URL,
