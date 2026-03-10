@@ -50,6 +50,17 @@
 .env
 .env.test
 .eslintcache
+
+# Personal deployment scripts with credentials (SECURITY)
+scripts/deploy-*.sh
+scripts/*-credentials.sh
+scripts/server-*.sh
+scripts/my-*.sh
+scripts/local-*.sh
+
+# Generated environment config (contains sensitive keys)
+.env.generated
+
 .fseventsd
 .fusebox/
 .grunt
