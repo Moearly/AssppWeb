@@ -16,8 +16,12 @@ router.post('/allocate', async (req: Request, res: Response) => {
   try {
     const { country } = req.body;
 
+    console.log('[Pool] Allocate request:', { country });
+
     // 选择最佳账号
     const account = poolService.selectAccount(country);
+    
+    console.log('[Pool] Selected account:', account ? `ID ${account.id}` : 'NULL');
     
     if (!account) {
       res.status(404).json({
@@ -29,6 +33,8 @@ router.post('/allocate', async (req: Request, res: Response) => {
 
     // 获取解密后的凭据
     const credentials = poolService.getAccountCredentials(account.id);
+    
+    console.log('[Pool] Got credentials:', credentials ? 'YES' : 'NO');
     
     if (!credentials) {
       res.status(500).json({ error: 'Failed to decrypt account credentials' });
@@ -42,6 +48,8 @@ router.post('/allocate', async (req: Request, res: Response) => {
 
     // 标记账号正在使用（增加使用次数）
     poolService.recordUsage(account.id);
+
+    console.log('[Pool] Allocated account ID', account.id);
 
     res.json({
       accountId: account.id,

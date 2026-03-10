@@ -114,6 +114,18 @@ router.post('/quick-download', async (req: Request, res: Response) => {
     } catch (error: any) {
       console.error('Purchase failed:', error);
       
+      // 检查是否是 NoAccount 错误
+      if (error.message && error.message.includes('NoAccount')) {
+        res.status(403).json({
+          error: 'Account has not acquired this app',
+          details: 'The account needs to "Get" this app in the App Store first. Please: 1) Login to App Store with this account on iPhone, 2) Search and tap "Get" on the app, 3) Try again.',
+          errorCode: 'NO_PURCHASE_HISTORY',
+          accountEmail: account.email,
+          appName: (app as any).name,
+        });
+        return;
+      }
+      
       // 如果是 "already purchased" 错误，继续获取下载信息
       if (!error.message.includes('already purchased')) {
         res.status(500).json({

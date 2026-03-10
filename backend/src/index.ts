@@ -16,6 +16,7 @@ import bagRoutes from "./routes/bag.js";
 import adminPoolRoutes from "./routes/admin/pool.js";
 import adminWhitelistRoutes from "./routes/admin/whitelist.js";
 import userAppsRoutes from "./routes/user/apps.js";
+import poolRoutes from "./routes/pool.js";
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use("/api", settingsRoutes);
 app.use("/api", bagRoutes);
 
 // 账号池 API 路由
+app.use("/api/pool", poolRoutes);
 app.use("/api/admin/pool", adminPoolRoutes);
 app.use("/api/admin/whitelist", adminWhitelistRoutes);
 app.use("/api/user", userAppsRoutes);

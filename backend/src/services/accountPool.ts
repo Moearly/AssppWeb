@@ -261,8 +261,8 @@ export class AccountPoolService {
    */
   selectAccount(country?: string): Omit<PoolAccount, 'encryptedData'> | null {
     let query = `
-      SELECT 
-        id, email, email_hash as emailHash, country, 
+      SELECT
+        id, email, email_hash as emailHash, country,
         device_identifier as deviceIdentifier, pod, status,
         last_used_at as lastUsedAt, usage_count as usageCount,
         created_at as createdAt, updated_at as updatedAt
@@ -273,7 +273,7 @@ export class AccountPoolService {
     const params: any[] = [];
 
     if (country) {
-      query += ' AND country = ?';
+      query += ' AND LOWER(country) = LOWER(?)';
       params.push(country);
     }
 

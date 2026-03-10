@@ -17,13 +17,20 @@ RUN npm run build
 
 # Stage 3: Runtime
 FROM node:20-alpine
-RUN apk add --no-cache zip
+RUN apk add --no-cache zip python3 make g++
 WORKDIR /app
 COPY --from=backend-build /app/backend/dist ./dist
-COPY --from=backend-build /app/backend/node_modules ./node_modules
 COPY --from=backend-build /app/backend/package.json ./
 COPY --from=backend-build /app/backend/src/db/schema.sql ./dist/db/
 COPY --from=frontend-build /app/frontend/dist ./public
+
+# 先复制 node_modules（但不包括 better-sqlite3）
+COPY --from=backend-build /app/backend/node_modules ./node_modules
+
+# 在运行时环境重新安装 better-sqlite3（确保 native 模块正确编译）
+# 这会覆盖从 backend-build 复制的错误版本
+RUN npm install better-sqlite3@11.8.1
+
 RUN mkdir -p /data/packages
 EXPOSE 8080
 ENV DATA_DIR=/data PORT=8080
